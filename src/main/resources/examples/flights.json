@@ -1,0 +1,18 @@
+[
+  {
+    "AirlineName": "AmericanAirline",
+    "ID": 1,
+    "Code": "ER38sd",
+    "Origin": "CLE",
+    "Destination": "SFO",
+    "SeatsAvailable": 40
+  },
+  {
+    "AirlineName": "AmericanAirline",
+    "ID": 2,
+    "Code": "DEr45",
+    "Origin": "SDR",
+    "Destination": "AQS",
+    "SeatsAvailable": 12
+  }
+]

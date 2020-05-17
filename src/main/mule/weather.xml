@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:wsc="http://www.mulesoft.org/schema/mule/wsc"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/current/mule-wsc.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<wsc:config name="Web_Service_Consumer_Config" doc:name="Web Service Consumer Config" doc:id="ebee1446-8f84-4fc3-b01b-5b5ebabe68f5" >
+		<wsc:connection wsdlLocation="https://www.crcind.com/csp/samples/SOAP.Demo.cls?wsdl" service="SOAPDemo" port="SOAPDemoSoap" address="https://www.crcind.com:443/csp/samples/SOAP.Demo.cls"/>
+	</wsc:config>
+	<flow name="weatherFlow" doc:id="94badece-d30a-423a-93dd-fd8ab9ee2682" >
+		<http:listener doc:name="Listener" doc:id="efca9902-6142-4ee1-81ec-5df582cba334" config-ref="HTTP_Listener_config_global" path="weather">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response statusCode="#[vars.httpStatus default 500]">
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<set-variable value="#[attributes.queryParams.zip as String]" doc:name="Set Query Param" doc:id="8c04f63d-3c57-4ab9-9ad4-68d719ad82af" variableName="ZipCode"/>
+		<ee:transform doc:name="Map WS Request" doc:id="0eaa0d46-0f23-44c8-ae3b-86001ba3946a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 http://ws.cdyne.com/WeatherWS/
+ns ns01 http://tempuri.org
+---
+{
+	ns01#LookupCity: {
+		ns01#zip: vars.ZipCode
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<wsc:consume doc:name="Consume" doc:id="be9c8e55-920a-474b-bed5-7b57dbf0cea6" config-ref="Web_Service_Consumer_Config" operation="LookupCity"/>
+		<ee:transform doc:name="Transform Message" doc:id="f5f7da06-045c-417d-b9ea-aa795caa8750" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Zip": payload.body.LookupCityResponse.LookupCityResult.Zip default "",
+	"City": payload.body.LookupCityResponse.LookupCityResult.City default "",
+	"Street": payload.body.LookupCityResponse.LookupCityResult.State default "",
+	"State": payload.body.LookupCityResponse.LookupCityResult.State default ""
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="7f983951-d076-49f6-a328-174d0e6a9559" >
+				<ee:transform doc:name="Transform Message" doc:id="8b861ad5-f233-43c7-81c4-60411465eb0d" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Message": "Error Occurred." ++ (error.description default "")
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

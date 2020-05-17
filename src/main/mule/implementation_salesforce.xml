@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="implementation_salesforceFlow" doc:id="f79af611-eb02-4bbb-a497-5e59d22e9e5a" >
+		<http:listener doc:name="Listener" doc:id="53636128-c099-4bea-8803-f099c6f97fd7" config-ref="HTTP_Listener_config_global" path="/salesforce/flights" allowedMethods="PUT"/>
+		<ee:transform doc:name="Map Flight Data" doc:id="211b9f7b-a35b-4b0a-be4c-ada25b3c556c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map(flightData, index) -> 
+{
+	Name: flightData.AirlineName,
+	FlightID__c: flightData.ID,
+	FlightCode__c: flightData.Code,
+	Origin__c: flightData.Origin,
+	Destination__c: flightData.Destination,
+	EmptySeats__c: flightData.SeatsAvailable
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert-multiple type="AirlineFlights__c" doc:name="Upsert Flight Data" doc:id="c38e2a18-ff0b-4069-b469-8f774515dc1a" config-ref="Salesforce_Config" externalIdFieldName="FlightID__c" />
+		<ee:transform doc:name="Set Reply" doc:id="4fc566ba-9323-44d9-a50e-01241dfca541" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Result": "Records added successfully",
+	"Total Item Added": sizeOf(payload.items.*id default [] as Array)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="78056f50-5e98-4470-80aa-111f329bae6e" >
+				<ee:transform doc:name="Set Error" doc:id="21e57d47-3099-4481-ae4c-4fc60b3f0a21" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	Message: "Error Occurred." ++ (error.detailedDescription default "")
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

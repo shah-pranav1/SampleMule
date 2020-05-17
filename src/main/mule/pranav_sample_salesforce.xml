@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="4f24595b-7ba8-4231-a2bb-1f5dfa5070a2" file="config.yaml" />
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="4572a89a-d2de-4c76-8900-1ae9ca09c300" >
+		<salesforce:cached-basic-connection username="shah.pranav1@gmail.com" password="Key2success" securityToken="xnMfFyGvBy3QhVqs6a7zE4rxr" />
+	</salesforce:sfdc-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="6111a972-acb6-425c-84b9-6c4c4a5e447e">
+		<http:request-connection host="0.0.0.0" port="8081" />
+	</http:request-config>
+	<flow name="pranav_sample_salesforceFlow" doc:id="6d097648-7962-4178-b5dc-a519cd31f8ac" >
+		<http:listener doc:name="Listener" doc:id="46bdd64b-6079-4eeb-8c03-6cb740f2e3a0" path="mysqltosfapp" config-ref="HTTP_Listener_config_global">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response statusCode="#[vars.httpStatus default 500]">
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<http:request method="GET" doc:name="Get Flight Data" doc:id="fc8ed62e-007b-4e2b-a563-495ae0c4b9cb" config-ref="HTTP_Request_configuration" path="/mysql/flights"/>
+		<ee:transform doc:name="Map Flight Data" doc:id="c5cf9f1b-00d4-439f-bfb9-d371149aa437" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( data , index ) -> {
+	AirlineName: data.airlineName,
+	ID: data.ID,
+	Code: data.code1,
+	Origin: data.fromAirport,
+	Destination: data.toAirport,
+	SeatsAvailable: data.seatsAvailable
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="PUT" doc:name="Sent Data To Salesforce" doc:id="ef54a737-b74e-4be6-b838-acb6915072a9" config-ref="HTTP_Request_configuration" path="/salesforce/flights"/>
+		<ee:transform doc:name="Set Reply" doc:id="77b608cd-65ce-408a-a64d-cb1f4c6be0a3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Result": "Success"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="8c0bbe88-a447-4202-ac4e-b3534507de0e" >
+				<ee:transform doc:name="Set Error" doc:id="d904ea8f-c1e7-41b8-a1bf-7ae912b2b2fb" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Message: "Error Occurred." ++ (error.detailedDescription default "")
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
